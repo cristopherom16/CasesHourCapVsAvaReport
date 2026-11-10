@@ -657,14 +657,14 @@
 <script>
     // --- FIREBASE CONFIGURATION (Direct Integration) ---
     const firebaseConfig = {
-        apiKey: "AIzaSyAmB9PhTd_Dz68rTZQZlRS1mcfAy1SQxgo",
-        authDomain: "volumevsavailability.firebaseapp.com",
-        databaseURL: "https://volumevsavailability-default-rtdb.firebaseio.com",
-        projectId: "volumevsavailability",
-        storageBucket: "volumevsavailability.firebasestorage.app",
-        messagingSenderId: "536106438860",
-        appId: "1:536106438860:web:a7b62c957028813d9f3269",
-        measurementId: "G-YDZ8542ENX"
+        apiKey: "AIzaSyDItLahiEHNyUuNGcNsUU24pgkM8VQVAp0",
+        authDomain: "casescapvsavbldashboard.firebaseapp.com",
+        databaseURL: "https://casescapvsavbldashboard-default-rtdb.firebaseio.com",
+        projectId: "casescapvsavbldashboard",
+        storageBucket: "casescapvsavbldashboard.firebasestorage.app",
+        messagingSenderId: "127445145571",
+        appId: "1:127445145571:web:91e2d343fc33ceec0272d6",
+        measurementId: "G-TX1RRL0JZE"
     };
 
     let firebaseDB = null;
@@ -1306,7 +1306,7 @@ Mirannda M.	50	40	60	30`;
         document.getElementById('pastedData').value = sample;
     }
 
-    // Line parser isolates metrics and extracts the teammate name
+    // Universal line parser isolates metrics and extracts the teammate name
     function parseTeammateLine(line) {
         if (!line) return null;
         const lower = line.toLowerCase();
@@ -1456,7 +1456,7 @@ Mirannda M.	50	40	60	30`;
 
             closeModal('importModal');
             document.getElementById('pastedData').value = '';
-            showToast(`Auto-assigned ${importedCount} teammates across rosters! (${excludedCount} excluded as non-members).`);
+            showToast(`Auto-assigned ${importedCount} teammates across all teams! (${excludedCount} excluded as non-members).`);
 
         } catch (err) {
             console.error(err);
@@ -1846,10 +1846,7 @@ Mirannda M.	50	40	60	30`;
             }
             firebaseDB = firebase.database();
 
-            // Ensure Firebase has all 6 teams permanently registered
-            firebaseDB.ref('caseTeamRosters').set(getCleanDataForFirebase(teamRosters));
-
-            // Listen to live case volume updates
+            // Listen to live case volume updates and auto-refresh view
             firebaseDB.ref('caseVolumeStore').on('value', (snapshot) => {
                 const val = snapshot.val();
                 if (val) {
@@ -1865,8 +1862,10 @@ Mirannda M.	50	40	60	30`;
                 if (val) {
                     teamRosters = ensureCompleteRoster(val);
                     safeSet('WFM_CASE_ROSTERS', teamRosters);
-                    renderDashboard();
+                } else {
+                    firebaseDB.ref('caseTeamRosters').set(getCleanDataForFirebase(teamRosters));
                 }
+                renderDashboard();
             });
 
             // Listen to live raw pasted tables store
