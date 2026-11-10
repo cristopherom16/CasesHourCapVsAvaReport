@@ -567,7 +567,7 @@
         <h2 class="section-title">Import Case & Conversation Volume Data</h2>
         
         <p style="font-size: 13px; line-height: 1.5; margin-bottom: 15px; color: var(--navy-deep);">
-            <strong>Auto-Distribution Mode:</strong> Paste your entire table without separating by team. Teammates will be automatically categorized into their assigned teams (OBS Support, ELD Support, INS Support, LL+ Support, TFX Support, After Hours Support). Any teammate not found in your official roster will be automatically excluded.
+            <strong>Auto-Distribution Mode:</strong> Paste your entire table without separating by team. Teammates will be automatically categorized into their assigned teams (OBS Support, ELD Support, INS Support, LL+ Support, TFX Support, After Hours Support). Any teammate not found will trigger an immediate option to add them to a team and set their schedule!
         </p>
 
         <div class="form-group" style="align-items: center;">
@@ -592,6 +592,41 @@
         <div class="action-row">
             <button type="button" class="btn" style="background-color: transparent; border: 1px solid var(--navy-deep);" onclick="closeModal('importModal')">Cancel</button>
             <button type="button" class="btn" onclick="processPastedData()">Save & Render Dashboard</button>
+        </div>
+    </div>
+</div>
+
+<!-- Modal to Register Unknown/Unlisted Teammates found in Paste -->
+<div id="unregisteredModal" class="modal">
+    <div class="modal-content" style="max-width: 1050px;">
+        <span class="close-btn" onclick="closeModal('unregisteredModal')">&times;</span>
+        <h2 class="section-title">⚠️ Unregistered Teammate(s) Detected</h2>
+        <p style="font-size: 13px; line-height: 1.5; margin-bottom: 15px; color: var(--navy-deep);">
+            The following teammate(s) were found in your pasted data but are not currently assigned to any team roster. Choose their team and configure their schedule to include them in the dashboard calculations:
+        </p>
+
+        <div style="max-height: 380px; overflow-y: auto; margin-bottom: 20px;">
+            <table style="width: 100%;">
+                <thead>
+                    <tr>
+                        <th>Teammate Name</th>
+                        <th>Team Assignment</th>
+                        <th>Branch</th>
+                        <th>Clock In</th>
+                        <th>Break 1</th>
+                        <th>Lunch</th>
+                        <th>Break 2</th>
+                        <th>Clock Out</th>
+                        <th>Include?</th>
+                    </tr>
+                </thead>
+                <tbody id="unregisteredTableBody"></tbody>
+            </table>
+        </div>
+
+        <div class="action-row">
+            <button type="button" class="btn" style="background-color: transparent; border: 1px solid var(--navy-deep);" onclick="skipUnregisteredAgents()">Skip All & Finish</button>
+            <button type="button" class="btn" onclick="confirmAddUnregisteredAgents()">Add to Teams & Render</button>
         </div>
     </div>
 </div>
@@ -809,8 +844,8 @@
             .replace(/\s+/g, " ");
     }
 
-    // Build Master Search Index with All Agents & Known Aliases
-    const MASTER_AGENTS_INDEX = [];
+    // Dynamic Master Search Index that updates when new agents are registered
+    let MASTER_AGENTS_INDEX = [];
     const KNOWN_ALIASES = {
         "juan avedano": ["juan avendano"],
         "celina ramirez": ["celina franco"],
@@ -832,25 +867,28 @@
         "danae fergoso": ["danae castillo"]
     };
 
-    Object.keys(OFFICIAL_ROSTERS).forEach(team => {
-        OFFICIAL_ROSTERS[team].forEach(agent => {
-            const n = normalizeName(agent.name);
-            const aliasList = [n];
-            if (KNOWN_ALIASES[n]) {
-                aliasList.push(...KNOWN_ALIASES[n].map(normalizeName));
-            }
-            aliasList.forEach(aStr => {
-                const tokens = new Set(aStr.split(' ').filter(t => t.length > 1));
-                MASTER_AGENTS_INDEX.push({
-                    name: agent.name,
-                    team: team,
-                    norm: aStr,
-                    tokens: tokens,
-                    agent: agent
+    function rebuildMasterAgentsIndex() {
+        MASTER_AGENTS_INDEX = [];
+        Object.keys(teamRosters).forEach(team => {
+            (teamRosters[team] || []).forEach(agent => {
+                const n = normalizeName(agent.name);
+                const aliasList = [n];
+                if (KNOWN_ALIASES[n]) {
+                    aliasList.push(...KNOWN_ALIASES[n].map(normalizeName));
+                }
+                aliasList.forEach(aStr => {
+                    const tokens = new Set(aStr.split(' ').filter(t => t.length > 1));
+                    MASTER_AGENTS_INDEX.push({
+                        name: agent.name,
+                        team: team,
+                        norm: aStr,
+                        tokens: tokens,
+                        agent: agent
+                    });
                 });
             });
         });
-    });
+    }
 
     // Flexible Matcher that removes team name noise if present in clipboard
     function findAgentInRosters(rawName) {
@@ -858,7 +896,6 @@
         let clean = normalizeName(rawName);
         if (!clean) return null;
 
-        // Strip embedded team names like "OBS Support", "ELD", etc.
         const teamStrips = ["obs support", "eld support", "ins support", "ll support", "tfx support", "after hours support", "obs", "eld", "ins", "ll", "tfx", "after hours"];
         teamStrips.forEach(kw => {
             clean = clean.replace(new RegExp('\\b' + kw + '\\b', 'g'), ' ');
@@ -903,7 +940,6 @@
         return bestItem;
     }
 
-    // Upgrade old team keys if they were stored without "Support"
     function normalizeVolumeStoreKeys(store) {
         if (!store || typeof store !== 'object') return { "OBS Support": {}, "ELD Support": {}, "INS Support": {}, "LL+ Support": {}, "TFX Support": {}, "After Hours Support": {} };
         const keyMap = {
@@ -925,7 +961,6 @@
         return normalized;
     }
 
-    // Auto-scrubber: cleans and validates case storage against master distribution list
     function scrubVolumeStore(store) {
         const cleaned = { "OBS Support": {}, "ELD Support": {}, "INS Support": {}, "LL+ Support": {}, "TFX Support": {}, "After Hours Support": {} };
         const normStore = normalizeVolumeStoreKeys(store);
@@ -959,7 +994,6 @@
         return cleaned;
     }
 
-    // Guarantee that all 6 teams exist at all times
     function ensureCompleteRoster(rosterObj) {
         const full = JSON.parse(JSON.stringify(OFFICIAL_ROSTERS));
         if (rosterObj && typeof rosterObj === 'object') {
@@ -972,9 +1006,10 @@
         return full;
     }
 
-    // Load guaranteed Rosters
+    // Load guaranteed Rosters & build index
     let teamRosters = ensureCompleteRoster(safeGet('WFM_CASE_ROSTERS'));
     safeSet('WFM_CASE_ROSTERS', teamRosters);
+    rebuildMasterAgentsIndex();
 
     // Primary Volume Store Initialization and Auto-Purge
     let rawStore = safeGet('WFM_CASE_VOLUME_STORE');
@@ -997,6 +1032,10 @@
     let editingTeam = null;
     let currentRenderedHourlyData = [];
     let currentRenderedTeammateData = [];
+
+    // State for staged unknown agents awaiting assignment
+    let stagedTargetDate = null;
+    let stagedUnknownItems = [];
 
     // Toast Notifications
     function showToast(message) {
@@ -1025,7 +1064,7 @@
         document.getElementById('themeToggleBtn').innerText = '☀️';
     }
 
-    // Modal Handlers & Automatic Table Loading for Date
+    // Modal Handlers
     function openModal(id) {
         const el = document.getElementById(id);
         if (el) el.style.display = "block";
@@ -1062,6 +1101,7 @@
         if(confirm("Are you sure you want to restore default rosters for all 6 teams? Manual edits will be reset.")) {
             teamRosters = JSON.parse(JSON.stringify(OFFICIAL_ROSTERS));
             safeSet('WFM_CASE_ROSTERS', teamRosters);
+            rebuildMasterAgentsIndex();
             if(firebaseDB) firebaseDB.ref('caseTeamRosters').set(getCleanDataForFirebase(teamRosters));
             resetEditMode();
             renderScheduleTable();
@@ -1114,7 +1154,7 @@
 
     function changeDate(offset) {
         const dateInput = document.getElementById('viewDateSelect');
-        if (!dateInput.value) return;
+        if (!dateInput) return;
         
         let [y, m, d] = dateInput.value.split('-').map(Number);
         let cur = new Date(y, m - 1, d);
@@ -1334,7 +1374,7 @@ Mirannda M.	50	40	60	30`;
         document.getElementById('pastedData').value = sample;
     }
 
-    // Universal line parser isolates metrics and extracts the teammate name
+    // Line parser isolates metrics and extracts the teammate name
     function parseTeammateLine(line) {
         if (!line) return null;
         const lower = line.toLowerCase();
@@ -1387,109 +1427,209 @@ Mirannda M.	50	40	60	30`;
             }
 
             const targetDate = document.getElementById('importDateSelect').value || document.getElementById('viewDateSelect').value || "2026-11-09";
+            stagedTargetDate = targetDate;
             const lines = rawText.split(/\r?\n/).map(l => l.trim()).filter(l => l.length > 0);
             
-            let importedCount = 0;
-            let excludedCount = 0;
+            let recognizedCount = 0;
+            stagedUnknownItems = [];
 
             lines.forEach(line => {
                 const parsed = parseTeammateLine(line);
                 if (!parsed || !parsed.rawName) return;
 
-                // Match against the complete 6-team Master Index
                 const matchResult = findAgentInRosters(parsed.rawName);
                 if (!matchResult) {
-                    excludedCount++; // Non-member -> Exclude
+                    // Collect unknown person for registration option
+                    stagedUnknownItems.push(parsed);
                     return;
                 }
 
                 const assignedTeam = matchResult.team;
                 const standardAgent = matchResult.agent;
 
-                if(!caseVolumeStore[assignedTeam]) caseVolumeStore[assignedTeam] = {};
-                if(!caseVolumeStore[assignedTeam][targetDate]) {
-                    caseVolumeStore[assignedTeam][targetDate] = {
-                        teammates: {},
-                        hourly: {}
-                    };
-                    hours.forEach(h => {
-                        caseVolumeStore[assignedTeam][targetDate].hourly[h] = { assigned: 0, repliedTo: 0, repliesSent: 0, closed: 0 };
-                    });
-                }
-
-                const safeKey = sanitizeKey(standardAgent.name);
-                caseVolumeStore[assignedTeam][targetDate].teammates[safeKey] = {
-                    name: standardAgent.name,
-                    team: assignedTeam,
-                    branch: standardAgent.branch || 'N/A',
-                    shift: `${standardAgent.in} - ${standardAgent.out}`,
-                    in: standardAgent.in,
-                    out: standardAgent.out,
-                    b1: standardAgent.b1,
-                    lunch: standardAgent.lunch,
-                    b2: standardAgent.b2,
-                    assigned: parsed.assigned,
-                    repliedTo: parsed.repliedTo,
-                    repliesSent: parsed.repliesSent,
-                    closed: parsed.closed
-                };
-
-                const activeHoursCount = getAgentActiveHoursCount(standardAgent);
-                const hourlyAssigned = parsed.assigned / activeHoursCount;
-                const hourlyRepliedTo = parsed.repliedTo / activeHoursCount;
-                const hourlyRepliesSent = parsed.repliesSent / activeHoursCount;
-                const hourlyClosed = parsed.closed / activeHoursCount;
-
-                hours.forEach(h => {
-                    if(isAgentActiveAtHour(standardAgent, h)) {
-                        const hSlot = caseVolumeStore[assignedTeam][targetDate].hourly[h];
-                        hSlot.assigned += hourlyAssigned;
-                        hSlot.repliedTo += hourlyRepliedTo;
-                        hSlot.repliesSent += hourlyRepliesSent;
-                        hSlot.closed += hourlyClosed;
-                    }
-                });
-
-                importedCount++;
+                applyParsedTeammateToStore(standardAgent, assignedTeam, targetDate, parsed);
+                recognizedCount++;
             });
 
-            if(importedCount === 0) {
-                alert(`No valid teammates from your distribution list were found in the pasted data.\n(${excludedCount} entries excluded because they are not in your official rosters)`);
-                return;
-            }
-
-            // Scrub store to guarantee absolute data hygiene
-            caseVolumeStore = scrubVolumeStore(caseVolumeStore);
-            safeSet('WFM_CASE_VOLUME_STORE', caseVolumeStore);
-
-            // Store raw text for navigation
+            // Store raw text
             rawPastedStore[targetDate] = rawText;
             safeSet('WFM_RAW_PASTED_STORE', rawPastedStore);
 
-            // Sync automatically and permanently to Firebase Realtime Database in ONE single atomic call
-            if(firebaseDB) {
-                try {
-                    const cleanPayload = getCleanDataForFirebase(caseVolumeStore);
-                    firebaseDB.ref('caseVolumeStore').set(cleanPayload);
-                    firebaseDB.ref(`rawPastedStore/${sanitizeKey(targetDate)}`).set(rawText);
-                } catch(fbErr) {
-                    console.warn("Cloud sync warning:", fbErr);
-                }
+            // If there are unknown teammates, prompt the user with the option to add them
+            if (stagedUnknownItems.length > 0) {
+                renderUnregisteredModal(stagedUnknownItems);
+                openModal('unregisteredModal');
+            } else {
+                finalizeSaveAndRender(recognizedCount);
             }
-
-            // Sync view to the imported date and switch to ALL teams for immediate global visibility
-            document.getElementById('viewDateSelect').value = targetDate;
-            document.getElementById('viewTeamSelect').value = "ALL";
-            syncFromDate();
-
-            closeModal('importModal');
-            document.getElementById('pastedData').value = '';
-            showToast(`Auto-assigned ${importedCount} teammates across all teams! (${excludedCount} excluded as non-members).`);
 
         } catch (err) {
             console.error(err);
             alert("Error parsing case data: " + err.message);
         }
+    }
+
+    function applyParsedTeammateToStore(standardAgent, assignedTeam, targetDate, parsed) {
+        if(!caseVolumeStore[assignedTeam]) caseVolumeStore[assignedTeam] = {};
+        if(!caseVolumeStore[assignedTeam][targetDate]) {
+            caseVolumeStore[assignedTeam][targetDate] = {
+                teammates: {},
+                hourly: {}
+            };
+            hours.forEach(h => {
+                caseVolumeStore[assignedTeam][targetDate].hourly[h] = { assigned: 0, repliedTo: 0, repliesSent: 0, closed: 0 };
+            });
+        }
+
+        const safeKey = sanitizeKey(standardAgent.name);
+        caseVolumeStore[assignedTeam][targetDate].teammates[safeKey] = {
+            name: standardAgent.name,
+            team: assignedTeam,
+            branch: standardAgent.branch || 'N/A',
+            shift: `${standardAgent.in} - ${standardAgent.out}`,
+            in: standardAgent.in,
+            out: standardAgent.out,
+            b1: standardAgent.b1,
+            lunch: standardAgent.lunch,
+            b2: standardAgent.b2,
+            assigned: parsed.assigned,
+            repliedTo: parsed.repliedTo,
+            repliesSent: parsed.repliesSent,
+            closed: parsed.closed
+        };
+
+        const activeHoursCount = getAgentActiveHoursCount(standardAgent);
+        const hourlyAssigned = parsed.assigned / activeHoursCount;
+        const hourlyRepliedTo = parsed.repliedTo / activeHoursCount;
+        const hourlyRepliesSent = parsed.repliesSent / activeHoursCount;
+        const hourlyClosed = parsed.closed / activeHoursCount;
+
+        hours.forEach(h => {
+            if(isAgentActiveAtHour(standardAgent, h)) {
+                const hSlot = caseVolumeStore[assignedTeam][targetDate].hourly[h];
+                hSlot.assigned += hourlyAssigned;
+                hSlot.repliedTo += hourlyRepliedTo;
+                hSlot.repliesSent += hourlyRepliesSent;
+                hSlot.closed += hourlyClosed;
+            }
+        });
+    }
+
+    // Render Registration Modal for Unknown Teammates
+    function renderUnregisteredModal(items) {
+        const tbody = document.getElementById('unregisteredTableBody');
+        let html = '';
+
+        items.forEach((item, idx) => {
+            html += `
+                <tr id="unreg_row_${idx}">
+                    <td>
+                        <input type="text" id="unreg_name_${idx}" value="${item.rawName}" style="font-weight: bold; width: 150px;">
+                    </td>
+                    <td>
+                        <select id="unreg_team_${idx}" style="font-size: 12px; padding: 6px;">
+                            ${allTeamsList.map(t => `<option value="${t}">${t}</option>`).join('')}
+                        </select>
+                    </td>
+                    <td>
+                        <input type="text" id="unreg_branch_${idx}" value="GUA" style="width: 55px; text-align: center;">
+                    </td>
+                    <td>
+                        <input type="time" id="unreg_in_${idx}" value="08:00" style="padding: 4px;">
+                    </td>
+                    <td>
+                        <input type="text" id="unreg_b1_${idx}" value="10:00-10:15" style="width: 85px; text-align: center;">
+                    </td>
+                    <td>
+                        <input type="text" id="unreg_lunch_${idx}" value="13:00-14:00" style="width: 85px; text-align: center;">
+                    </td>
+                    <td>
+                        <input type="text" id="unreg_b2_${idx}" value="15:30-15:45" style="width: 85px; text-align: center;">
+                    </td>
+                    <td>
+                        <input type="time" id="unreg_out_${idx}" value="17:00" style="padding: 4px;">
+                    </td>
+                    <td>
+                        <input type="checkbox" id="unreg_inc_${idx}" checked style="transform: scale(1.3); cursor: pointer;">
+                    </td>
+                </tr>
+            `;
+        });
+        tbody.innerHTML = html;
+    }
+
+    function confirmAddUnregisteredAgents() {
+        let addedCount = 0;
+
+        stagedUnknownItems.forEach((parsed, idx) => {
+            const inc = document.getElementById(`unreg_inc_${idx}`).checked;
+            if (!inc) return;
+
+            const name = document.getElementById(`unreg_name_${idx}`).value.trim();
+            const team = document.getElementById(`unreg_team_${idx}`).value;
+            const branch = document.getElementById(`unreg_branch_${idx}`).value.trim() || 'GUA';
+            const cin = document.getElementById(`unreg_in_${idx}`).value || '08:00';
+            const b1 = document.getElementById(`unreg_b1_${idx}`).value.trim() || '10:00-10:15';
+            const lunch = document.getElementById(`unreg_lunch_${idx}`).value.trim() || '13:00-14:00';
+            const b2 = document.getElementById(`unreg_b2_${idx}`).value.trim() || '15:30-15:45';
+            const cout = document.getElementById(`unreg_out_${idx}`).value || '17:00';
+
+            const newAgent = {
+                name: name,
+                task: "Cases",
+                branch: branch,
+                in: cin,
+                b1: b1,
+                lunch: lunch,
+                b2: b2,
+                out: cout
+            };
+
+            if (!teamRosters[team]) teamRosters[team] = [];
+            teamRosters[team].push(newAgent);
+            addedCount++;
+
+            // Apply their cases to volume store
+            applyParsedTeammateToStore(newAgent, team, stagedTargetDate, parsed);
+        });
+
+        safeSet('WFM_CASE_ROSTERS', teamRosters);
+        rebuildMasterAgentsIndex();
+
+        closeModal('unregisteredModal');
+        finalizeSaveAndRender(addedCount);
+    }
+
+    function skipUnregisteredAgents() {
+        closeModal('unregisteredModal');
+        finalizeSaveAndRender(0);
+    }
+
+    function finalizeSaveAndRender(newCount) {
+        // Scrub store to guarantee absolute data hygiene
+        caseVolumeStore = scrubVolumeStore(caseVolumeStore);
+        safeSet('WFM_CASE_VOLUME_STORE', caseVolumeStore);
+
+        // Sync automatically and permanently to Firebase Realtime Database
+        if(firebaseDB) {
+            try {
+                const cleanPayload = getCleanDataForFirebase(caseVolumeStore);
+                firebaseDB.ref('caseVolumeStore').set(cleanPayload);
+                firebaseDB.ref('caseTeamRosters').set(getCleanDataForFirebase(teamRosters));
+                firebaseDB.ref(`rawPastedStore/${sanitizeKey(stagedTargetDate)}`).set(rawPastedStore[stagedTargetDate] || '');
+            } catch(fbErr) {
+                console.warn("Cloud sync warning:", fbErr);
+            }
+        }
+
+        // Sync view to the imported date and switch to ALL teams for immediate global visibility
+        document.getElementById('viewDateSelect').value = stagedTargetDate;
+        document.getElementById('viewTeamSelect').value = "ALL";
+        syncFromDate();
+
+        closeModal('importModal');
+        document.getElementById('pastedData').value = '';
+        showToast(`Saved! Dashboard refreshed and synchronized with Firebase.`);
     }
 
     // Render Dashboard
@@ -1807,6 +1947,7 @@ Mirannda M.	50	40	60	30`;
         }
 
         safeSet('WFM_CASE_ROSTERS', teamRosters);
+        rebuildMasterAgentsIndex();
         if(firebaseDB) firebaseDB.ref('caseTeamRosters').set(getCleanDataForFirebase(teamRosters));
         resetEditMode();
         renderDashboard();
@@ -1816,6 +1957,7 @@ Mirannda M.	50	40	60	30`;
         if(confirm("Are you sure you want to delete this agent?")) {
             teamRosters[team].splice(index, 1);
             safeSet('WFM_CASE_ROSTERS', teamRosters);
+            rebuildMasterAgentsIndex();
             if(firebaseDB) firebaseDB.ref('caseTeamRosters').set(getCleanDataForFirebase(teamRosters));
             if(editingIndex === index) resetEditMode();
             renderScheduleTable();
@@ -1893,6 +2035,7 @@ Mirannda M.	50	40	60	30`;
                 if (val) {
                     teamRosters = ensureCompleteRoster(val);
                     safeSet('WFM_CASE_ROSTERS', teamRosters);
+                    rebuildMasterAgentsIndex();
                 } else {
                     firebaseDB.ref('caseTeamRosters').set(getCleanDataForFirebase(teamRosters));
                 }
