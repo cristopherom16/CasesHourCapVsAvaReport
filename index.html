@@ -493,7 +493,7 @@
             </div>
         </div>
 
-        <!-- Staffing Required Table: Hour, Agents Active, Assigned, Replied To, Variance -->
+        <!-- Staffing Required Table: Hour, Agents Active, Assigned, Replied To, Variance (Full View without vertical scroll) -->
         <div class="card">
             <div class="section-title">Hourly Staffing & Variance (Benchmark: 15 Replied/Agent/Hr)</div>
             <div class="table-complete-view">
@@ -567,7 +567,7 @@
         <h2 class="section-title">Import Case & Conversation Volume Data</h2>
         
         <p style="font-size: 13px; line-height: 1.5; margin-bottom: 15px; color: var(--navy-deep);">
-            <strong>Auto-Distribution Mode:</strong> Paste your entire table without separating by team. Teammates will be automatically categorized into their assigned teams (OBS Support, ELD Support, INS Support, LL+ Support, TFX Support, After Hours Support). Any teammate not found will trigger an immediate option to add them to a team and set their schedule!
+            <strong>Auto-Distribution Mode:</strong> Paste your entire table without separating by team. Teammates will be automatically categorized into their assigned teams (OBS Support, ELD Support, INS Support, LL+ Support, TFX Support, After Hours Support). Any teammate not found will trigger an immediate option to add them to a team and set their schedule permanently!
         </p>
 
         <div class="form-group" style="align-items: center;">
@@ -596,13 +596,13 @@
     </div>
 </div>
 
-<!-- Modal to Register Unknown/Unlisted Teammates found in Paste -->
+<!-- Modal to Register Unknown/Unlisted Teammates found in Paste (SAVES FOREVER) -->
 <div id="unregisteredModal" class="modal">
     <div class="modal-content" style="max-width: 1050px;">
         <span class="close-btn" onclick="closeModal('unregisteredModal')">&times;</span>
         <h2 class="section-title">⚠️ Unregistered Teammate(s) Detected</h2>
         <p style="font-size: 13px; line-height: 1.5; margin-bottom: 15px; color: var(--navy-deep);">
-            The following teammate(s) were found in your pasted data but are not currently assigned to any team roster. Choose their team and configure their schedule to include them in the dashboard calculations:
+            The following teammate(s) were found in your pasted data but are not currently assigned to any team roster. Choose their team and configure their schedule. <strong>They will be permanently added to the team roster and Firebase so you can manage them anytime!</strong>
         </p>
 
         <div style="max-height: 380px; overflow-y: auto; margin-bottom: 20px;">
@@ -626,7 +626,7 @@
 
         <div class="action-row">
             <button type="button" class="btn" style="background-color: transparent; border: 1px solid var(--navy-deep);" onclick="skipUnregisteredAgents()">Skip All & Finish</button>
-            <button type="button" class="btn" onclick="confirmAddUnregisteredAgents()">Add to Teams & Render</button>
+            <button type="button" class="btn" onclick="confirmAddUnregisteredAgents()">Add to Teams & Save Forever</button>
         </div>
     </div>
 </div>
@@ -994,12 +994,25 @@
         return cleaned;
     }
 
+    // Merge baseline official rosters with saved additions
     function ensureCompleteRoster(rosterObj) {
         const full = JSON.parse(JSON.stringify(OFFICIAL_ROSTERS));
         if (rosterObj && typeof rosterObj === 'object') {
             allTeamsList.forEach(t => {
-                if (rosterObj[t] && Array.isArray(rosterObj[t]) && rosterObj[t].length > 0) {
-                    full[t] = rosterObj[t];
+                if (rosterObj[t] && Array.isArray(rosterObj[t])) {
+                    const officialList = full[t] || [];
+                    rosterObj[t].forEach(savedAgent => {
+                        if (savedAgent && savedAgent.name) {
+                            const normSaved = normalizeName(savedAgent.name);
+                            const existingIndex = officialList.findIndex(a => normalizeName(a.name) === normSaved);
+                            if (existingIndex >= 0) {
+                                officialList[existingIndex] = savedAgent;
+                            } else {
+                                officialList.push(savedAgent);
+                            }
+                        }
+                    });
+                    full[t] = officialList;
                 }
             });
         }
@@ -1154,7 +1167,7 @@
 
     function changeDate(offset) {
         const dateInput = document.getElementById('viewDateSelect');
-        if (!dateInput) return;
+        if (!dateInput.value) return;
         
         let [y, m, d] = dateInput.value.split('-').map(Number);
         let cur = new Date(y, m - 1, d);
@@ -1374,7 +1387,7 @@ Mirannda M.	50	40	60	30`;
         document.getElementById('pastedData').value = sample;
     }
 
-    // Line parser isolates metrics and extracts the teammate name
+    // Universal line parser isolates metrics and extracts the teammate name
     function parseTeammateLine(line) {
         if (!line) return null;
         const lower = line.toLowerCase();
@@ -1439,7 +1452,7 @@ Mirannda M.	50	40	60	30`;
 
                 const matchResult = findAgentInRosters(parsed.rawName);
                 if (!matchResult) {
-                    // Collect unknown person for registration option
+                    // Collect unknown person for permanent registration option
                     stagedUnknownItems.push(parsed);
                     return;
                 }
@@ -1515,7 +1528,7 @@ Mirannda M.	50	40	60	30`;
         });
     }
 
-    // Render Registration Modal for Unknown Teammates
+    // Render Registration Modal for Unknown Teammates (Add Permanently)
     function renderUnregisteredModal(items) {
         const tbody = document.getElementById('unregisteredTableBody');
         let html = '';
@@ -1558,6 +1571,7 @@ Mirannda M.	50	40	60	30`;
         tbody.innerHTML = html;
     }
 
+    // SAVES PERMANENTLY FOREVER IN ROSTERS & FIREBASE
     function confirmAddUnregisteredAgents() {
         let addedCount = 0;
 
@@ -1585,16 +1599,28 @@ Mirannda M.	50	40	60	30`;
                 out: cout
             };
 
+            // Permanent insertion into Team Rosters
             if (!teamRosters[team]) teamRosters[team] = [];
-            teamRosters[team].push(newAgent);
+            const existingIdx = teamRosters[team].findIndex(a => normalizeName(a.name) === normalizeName(name));
+            if (existingIdx >= 0) {
+                teamRosters[team][existingIdx] = newAgent;
+            } else {
+                teamRosters[team].push(newAgent);
+            }
             addedCount++;
 
             // Apply their cases to volume store
             applyParsedTeammateToStore(newAgent, team, stagedTargetDate, parsed);
         });
 
+        // Save new roster permanently to LocalStorage and index
         safeSet('WFM_CASE_ROSTERS', teamRosters);
         rebuildMasterAgentsIndex();
+
+        // Save new roster permanently to Firebase
+        if (firebaseDB) {
+            firebaseDB.ref('caseTeamRosters').set(getCleanDataForFirebase(teamRosters));
+        }
 
         closeModal('unregisteredModal');
         finalizeSaveAndRender(addedCount);
@@ -1943,7 +1969,7 @@ Mirannda M.	50	40	60	30`;
         } else {
             if(!teamRosters[team]) teamRosters[team] = [];
             teamRosters[team].push(agentData);
-            showToast(`New agent ${name} saved!`);
+            showToast(`New agent ${name} saved permanently!`);
         }
 
         safeSet('WFM_CASE_ROSTERS', teamRosters);
@@ -2008,7 +2034,7 @@ Mirannda M.	50	40	60	30`;
         showToast("Excel report exported successfully!");
     }
 
-    // Firebase Real-time Initialization
+    // Firebase Real-time Initialization (Protected against accidental overwrites)
     function initFirebase() {
         try {
             if (!firebase.apps.length) {
@@ -2016,10 +2042,21 @@ Mirannda M.	50	40	60	30`;
             }
             firebaseDB = firebase.database();
 
-            // Ensure Firebase has all 6 teams permanently registered
-            firebaseDB.ref('caseTeamRosters').set(getCleanDataForFirebase(teamRosters));
+            // 1. Listen to live roster updates
+            firebaseDB.ref('caseTeamRosters').on('value', (snapshot) => {
+                const val = snapshot.val();
+                if (val) {
+                    teamRosters = ensureCompleteRoster(val);
+                    safeSet('WFM_CASE_ROSTERS', teamRosters);
+                    rebuildMasterAgentsIndex();
+                    renderDashboard();
+                } else {
+                    // Seed ONLY if Firebase is completely empty
+                    firebaseDB.ref('caseTeamRosters').set(getCleanDataForFirebase(teamRosters));
+                }
+            });
 
-            // Listen to live case volume updates and auto-refresh view
+            // 2. Listen to live case volume updates and auto-refresh view
             firebaseDB.ref('caseVolumeStore').on('value', (snapshot) => {
                 const val = snapshot.val();
                 if (val) {
@@ -2029,20 +2066,7 @@ Mirannda M.	50	40	60	30`;
                 }
             });
 
-            // Listen to live roster updates
-            firebaseDB.ref('caseTeamRosters').on('value', (snapshot) => {
-                const val = snapshot.val();
-                if (val) {
-                    teamRosters = ensureCompleteRoster(val);
-                    safeSet('WFM_CASE_ROSTERS', teamRosters);
-                    rebuildMasterAgentsIndex();
-                } else {
-                    firebaseDB.ref('caseTeamRosters').set(getCleanDataForFirebase(teamRosters));
-                }
-                renderDashboard();
-            });
-
-            // Listen to live raw pasted tables store
+            // 3. Listen to live raw pasted tables store
             firebaseDB.ref('rawPastedStore').on('value', (snapshot) => {
                 const val = snapshot.val();
                 if (val) {
@@ -2060,4 +2084,4 @@ Mirannda M.	50	40	60	30`;
     initFirebase();
 </script>
 </body>
-</html>
+</html>                                          
