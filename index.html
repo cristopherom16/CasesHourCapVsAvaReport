@@ -43,11 +43,11 @@
             color: var(--text-color);
             margin: 0;
             padding-top: 20px;
-            padding-bottom: 90px;
+            padding-bottom: 160px;
             transition: background-color 0.3s ease;
         }
 
-        /* Container positioned exactly 10mm from floating buttons */
+        /* Container positioned exactly 10mm from floating controls */
         .container {
             margin-left: calc(68px + 10mm);
             margin-right: calc(190px + 10mm);
@@ -91,7 +91,7 @@
             text-align: center;
         }
 
-        /* Navigation Bar inside Header */
+        /* Top Header Selectors - Amber Background & Deep Navy Text */
         .header-selects {
             display: flex;
             gap: 10px;
@@ -101,9 +101,9 @@
         }
 
         .header-select {
-            background-color: transparent;
-            color: var(--amber-dominant);
-            border: 1px solid var(--amber-dominant);
+            background-color: var(--amber-dominant);
+            color: var(--navy-deep);
+            border: 2px solid var(--navy-deep);
             padding: 8px 12px;
             border-radius: 4px;
             font-weight: bold;
@@ -111,16 +111,21 @@
             cursor: pointer;
             outline: none;
             appearance: none;
-            background-image: url('data:image/svg+xml;utf8,<svg fill="%23FFBF00" height="24" viewBox="0 0 24 24" width="24" xmlns="http://www.w3.org/2000/svg"><path d="M7 10l5 5 5-5z"/><path d="M0 0h24v24H0z" fill="none"/></svg>');
+            background-image: url('data:image/svg+xml;utf8,<svg fill="%230A192F" height="24" viewBox="0 0 24 24" width="24" xmlns="http://www.w3.org/2000/svg"><path d="M7 10l5 5 5-5z"/><path d="M0 0h24v24H0z" fill="none"/></svg>');
             background-repeat: no-repeat;
             background-position-x: calc(100% - 6px);
             background-position-y: center;
             padding-right: 28px;
+            transition: background-color 0.2s;
+        }
+
+        .header-select:hover {
+            background-color: var(--amber-hover);
         }
 
         .header-select option {
-            background-color: var(--navy-deep);
-            color: var(--amber-dominant);
+            background-color: var(--amber-light);
+            color: var(--navy-deep);
         }
 
         .date-nav {
@@ -130,20 +135,23 @@
         }
 
         .date-nav input[type="date"] {
+            background-color: var(--amber-dominant);
+            color: var(--navy-deep);
+            border: 2px solid var(--navy-deep);
             background-image: none;
             padding-right: 12px;
             cursor: pointer;
         }
 
         .date-nav input[type="date"]::-webkit-calendar-picker-indicator {
-            filter: invert(0.7) sepia(1) saturate(5) hue-rotate(10deg);
+            filter: brightness(0);
             cursor: pointer;
         }
 
         .btn-arrow {
-            background-color: transparent;
-            color: var(--amber-dominant);
-            border: 1px solid var(--amber-dominant);
+            background-color: var(--amber-dominant);
+            color: var(--navy-deep);
+            border: 2px solid var(--navy-deep);
             border-radius: 4px;
             padding: 6px 10px;
             font-weight: bold;
@@ -151,7 +159,9 @@
             font-size: 14px;
             transition: background 0.2s;
         }
-        .btn-arrow:hover { background-color: rgba(255, 191, 0, 0.2); }
+        .btn-arrow:hover { 
+            background-color: var(--amber-hover); 
+        }
 
         .btn-arrow-modal {
             background-color: var(--navy-deep);
@@ -165,15 +175,6 @@
             transition: background 0.2s;
         }
         .btn-arrow-modal:hover { background-color: #112240; }
-
-        .nav-actions {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 10px;
-            flex-wrap: wrap;
-            width: 100%;
-        }
 
         .btn {
             background-color: var(--amber-dominant);
@@ -311,13 +312,39 @@
         }
         .btn-theme:hover { background-color: #112240; transform: scale(1.05); }
 
-        .btn-export {
+        /* 3 Stacked Floating Action Buttons (Right) */
+        .floating-actions-stack {
+            position: fixed;
+            bottom: 20px;
             right: 20px;
-            width: 170px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            z-index: 999;
+        }
+
+        .floating-action-btn {
+            width: 190px;
             height: 44px;
             background-color: var(--navy-deep);
             color: var(--amber-dominant);
             border: 2px solid var(--amber-dominant);
+            border-radius: 4px;
+            font-size: 13px;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            padding: 0 10px;
+            transition: background 0.2s, transform 0.1s;
+        }
+
+        .floating-action-btn:hover {
+            background-color: #112240;
+            transform: scale(1.02);
         }
 
         /* Toast Notifications */
@@ -374,51 +401,46 @@
             <h1>AVAILABILITY VS CASES VOLUME DASHBOARD</h1>
             <div id="currentContext" class="dashboard-subtitle">Displaying: Select data</div>
         </div>
-        <div class="nav-actions">
-            <!-- View Navigators with Dynamic Date Picker -->
-            <div class="header-selects">
-                <select id="viewMonthSelect" class="header-select" onchange="syncFromMonthWeek()">
-                    <option value="January">January</option>
-                    <option value="February">February</option>
-                    <option value="March">March</option>
-                    <option value="April">April</option>
-                    <option value="May">May</option>
-                    <option value="June">June</option>
-                    <option value="July">July</option>
-                    <option value="August">August</option>
-                    <option value="September">September</option>
-                    <option value="October">October</option>
-                    <option value="November" selected>November</option>
-                    <option value="December">December</option>
-                </select>
-                <select id="viewWeekSelect" class="header-select" onchange="syncFromMonthWeek()">
-                    <option value="Week 1">Week 1</option>
-                    <option value="Week 2" selected>Week 2</option>
-                    <option value="Week 3">Week 3</option>
-                    <option value="Week 4">Week 4</option>
-                    <option value="Week 5">Week 5</option>
-                </select>
-                
-                <!-- Dynamic Date Picker -->
-                <div class="date-nav">
-                    <button class="btn-arrow" onclick="changeDate(-1)">◀</button>
-                    <input type="date" id="viewDateSelect" class="header-select" onchange="syncFromDate()">
-                    <button class="btn-arrow" onclick="changeDate(1)">▶</button>
-                </div>
-
-                <select id="viewTeamSelect" class="header-select" onchange="saveState(); renderDashboard();">
-                    <option value="ALL">All Teams (Consolidated)</option>
-                    <option value="OBS Support" selected>OBS Support</option>
-                    <option value="ELD Support">ELD Support</option>
-                    <option value="INS Support">INS Support</option>
-                    <option value="LL+ Support">LL+ Support</option>
-                    <option value="TFX Support">TFX Support</option>
-                    <option value="After Hours Support">After Hours Support</option>
-                </select>
-            </div>
+        <!-- Selectors under title: Amber Background & Deep Navy Letters -->
+        <div class="header-selects">
+            <select id="viewMonthSelect" class="header-select" onchange="syncFromMonthWeek()">
+                <option value="January">January</option>
+                <option value="February">February</option>
+                <option value="March">March</option>
+                <option value="April">April</option>
+                <option value="May">May</option>
+                <option value="June">June</option>
+                <option value="July">July</option>
+                <option value="August">August</option>
+                <option value="September">September</option>
+                <option value="October">October</option>
+                <option value="November" selected>November</option>
+                <option value="December">December</option>
+            </select>
+            <select id="viewWeekSelect" class="header-select" onchange="syncFromMonthWeek()">
+                <option value="Week 1">Week 1</option>
+                <option value="Week 2" selected>Week 2</option>
+                <option value="Week 3">Week 3</option>
+                <option value="Week 4">Week 4</option>
+                <option value="Week 5">Week 5</option>
+            </select>
             
-            <button class="btn" onclick="checkPasswordAndOpenModal('scheduleModal')">👥 Manage Schedules</button>
-            <button class="btn" onclick="openModal('importModal')">📥 Paste Weekly Data</button>
+            <!-- Date Picker and Arrows with Amber Background & Deep Navy Letters -->
+            <div class="date-nav">
+                <button class="btn-arrow" onclick="changeDate(-1)">◀</button>
+                <input type="date" id="viewDateSelect" class="header-select" onchange="syncFromDate()">
+                <button class="btn-arrow" onclick="changeDate(1)">▶</button>
+            </div>
+
+            <select id="viewTeamSelect" class="header-select" onchange="saveState(); renderDashboard();">
+                <option value="ALL">All Teams (Consolidated)</option>
+                <option value="OBS Support" selected>OBS Support</option>
+                <option value="ELD Support">ELD Support</option>
+                <option value="INS Support">INS Support</option>
+                <option value="LL+ Support">LL+ Support</option>
+                <option value="TFX Support">TFX Support</option>
+                <option value="After Hours Support">After Hours Support</option>
+            </select>
         </div>
     </div>
 
@@ -471,7 +493,7 @@
             </div>
         </div>
 
-        <!-- Staffing Required Table: Hour, Agents Active, Assigned, Replied To, Variance (Full View without vertical scroll) -->
+        <!-- Staffing Required Table: Hour, Agents Active, Assigned, Replied To, Variance -->
         <div class="card">
             <div class="section-title">Hourly Staffing & Variance (Benchmark: 15 Replied/Agent/Hr)</div>
             <div class="table-complete-view">
@@ -530,7 +552,13 @@
 
 <!-- Floating Controls -->
 <button id="themeToggleBtn" class="floating-btn btn-theme" onclick="toggleTheme()" title="Toggle Theme">🌓</button>
-<button class="floating-btn btn btn-export" onclick="exportToExcel()">📊 Export to Excel</button>
+
+<!-- 3 Action Buttons on the Right in Requested Order: Dark Navy Background & Amber Gridline -->
+<div class="floating-actions-stack">
+    <button class="floating-action-btn" onclick="openModal('importModal')">📥 Paste Weekly Data</button>
+    <button class="floating-action-btn" onclick="checkPasswordAndOpenModal('scheduleModal')">👥 Manage Schedules</button>
+    <button class="floating-action-btn" onclick="exportToExcel()">📊 Download Excel</button>
+</div>
 
 <!-- Data Import Modal with Forward/Backward Navigation for Previously Saved Tables -->
 <div id="importModal" class="modal">
@@ -1845,6 +1873,9 @@ Mirannda M.	50	40	60	30`;
                 firebase.initializeApp(firebaseConfig);
             }
             firebaseDB = firebase.database();
+
+            // Ensure Firebase has all 6 teams permanently registered
+            firebaseDB.ref('caseTeamRosters').set(getCleanDataForFirebase(teamRosters));
 
             // Listen to live case volume updates and auto-refresh view
             firebaseDB.ref('caseVolumeStore').on('value', (snapshot) => {
