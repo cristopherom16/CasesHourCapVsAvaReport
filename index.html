@@ -258,6 +258,14 @@
         tr:nth-child(even) { background-color: var(--table-row-alt); }
         .deficit { color: var(--alert-red); font-weight: bold; }
         .surplus { color: var(--success-green); font-weight: bold; }
+        tr.row-absent-blocked td {
+            background-color: #D3D3D3;
+            color: #6E6E6E;
+        }
+        tr.row-absent-blocked td.status-absent {
+            color: #000000;
+            font-weight: bold;
+        }
 
         /* Actions in Tables */
         .action-btns {
@@ -1824,7 +1832,12 @@ Mirannda M.	50	40	60	30`;
         if(!hasData || dailyTeammatesList.length === 0) {
             teammateHTML = `<tr><td colspan="10" style="color: var(--navy-deep); font-weight: bold; padding: 25px;">No teammate records available for ${dateStr} (${contextLabel}). Paste data to view performance.</td></tr>`;
         } else {
-            dailyTeammatesList.forEach(stat => {
+            const sortedTeammatesList = [
+                ...dailyTeammatesList.filter(stat => Math.round(stat.repliedTo || 0) > 15),
+                ...dailyTeammatesList.filter(stat => Math.round(stat.repliedTo || 0) <= 15)
+            ];
+
+            sortedTeammatesList.forEach(stat => {
                 const matchResult = findAgentInRosters(stat.name);
                 const agent = matchResult ? matchResult.agent : stat;
                 const activeHours = getAgentActiveHoursCount(agent);
@@ -1833,13 +1846,15 @@ Mirannda M.	50	40	60	30`;
                 const repliedPerHour = Math.round(totalReplied / activeHours);
                 
                 let isMeetingTarget = repliedPerHour >= BENCHMARK_PER_HOUR;
+                let rowClass = '';
                 let statusClass = isMeetingTarget ? 'surplus' : 'deficit';
                 let statusText = isMeetingTarget 
                     ? `Target Met (${repliedPerHour}/hr)` 
                     : `Deficit (${repliedPerHour}/hr vs 15 target)`;
 
                 if (totalReplied <= 15) {
-                    statusClass = 'deficit';
+                    rowClass = ' class="row-absent-blocked"';
+                    statusClass = 'status-absent';
                     statusText = 'Absent/US/Management/Calls Team';
                 }
 
@@ -1856,7 +1871,7 @@ Mirannda M.	50	40	60	30`;
                     statusText: statusText
                 });
 
-                teammateHTML += `<tr>
+                teammateHTML += `<tr${rowClass}>
                     <td><strong>${stat.name}</strong></td>
                     <td>${stat.team}</td>
                     <td>${stat.branch || (agent ? agent.branch : 'N/A')}</td>
