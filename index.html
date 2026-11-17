@@ -515,6 +515,14 @@
         </div>
     </div>
 
+    <!-- Secondary Chart: Conversation Lifecycle Breakdown (MOVED ABOVE TEAMMATE PERFORMANCE) -->
+    <div class="card">
+        <div class="section-title">24-Hour Case Activity Lifecycle (Assigned vs Replied vs Closed)</div>
+        <div class="chart-box-secondary">
+            <canvas id="abandonedChart"></canvas>
+        </div>
+    </div>
+
     <!-- Teammate Performance (Rounded to Whole Integers) -->
     <div class="card">
         <div class="section-title">Teammate Performance</div>
@@ -538,14 +546,6 @@
                     <tr><td colspan="10">No teammate records imported for this selection.</td></tr>
                 </tbody>
             </table>
-        </div>
-    </div>
-
-    <!-- Secondary Chart: Conversation Lifecycle Breakdown -->
-    <div class="card">
-        <div class="section-title">24-Hour Case Activity Lifecycle (Assigned vs Replied vs Closed)</div>
-        <div class="chart-box-secondary">
-            <canvas id="abandonedChart"></canvas>
         </div>
     </div>
 </div>
@@ -1829,12 +1829,19 @@ Mirannda M.	50	40	60	30`;
                 const agent = matchResult ? matchResult.agent : stat;
                 const activeHours = getAgentActiveHoursCount(agent);
                 // Approximate to nearest whole integer
-                const repliedPerHour = Math.round((stat.repliedTo || 0) / activeHours);
-                const isMeetingTarget = repliedPerHour >= BENCHMARK_PER_HOUR;
-                const statusClass = isMeetingTarget ? 'surplus' : 'deficit';
-                const statusText = isMeetingTarget 
+                const totalReplied = Math.round(stat.repliedTo || 0);
+                const repliedPerHour = Math.round(totalReplied / activeHours);
+                
+                let isMeetingTarget = repliedPerHour >= BENCHMARK_PER_HOUR;
+                let statusClass = isMeetingTarget ? 'surplus' : 'deficit';
+                let statusText = isMeetingTarget 
                     ? `Target Met (${repliedPerHour}/hr)` 
                     : `Deficit (${repliedPerHour}/hr vs 15 target)`;
+
+                if (totalReplied <= 15) {
+                    statusClass = 'deficit';
+                    statusText = 'Absent/US/Management/Calls Team';
+                }
 
                 currentRenderedTeammateData.push({
                     name: stat.name,
@@ -2084,4 +2091,4 @@ Mirannda M.	50	40	60	30`;
     initFirebase();
 </script>
 </body>
-</html>                                          
+</html>
